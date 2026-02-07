@@ -178,7 +178,38 @@ let arnav =
       (insertion_sort (-1) (2) (0) (-4) (23) (-9)) check_sorted_list);
   ]
 
+(* Tests for Raheem Idowu *)
+let satsuma = 
+  let gcd a b =
+    [ gtext "main"
+      [ Movq, [~$a; ~%Rax ]
+      ; Movq, [~$b; ~%Rdi ] ]
+    ; text "gcd"
+      [ Cmpq, [~$0; ~%Rdi]
+      ; J Eq, [~$$"return"]
+      ; Cmpq, [~%Rdi; ~%Rax]
+      ; J Ge, [~$$"noswitch"]
+      ; Movq, [~%Rax; ~%Rdx]
+      ; Movq, [~%Rdi; ~%Rax]
+      ; Movq, [~%Rdx; ~%Rdi] ]
+    ; text "noswitch"
+      [ Subq, [~%Rdi; ~%Rax]
+      ; Movq, [~%Rax; ~%Rdx]
+      ; Movq, [~%Rdi; ~%Rax]
+      ; Movq, [~%Rdx; ~%Rdi] 
+      ; Jmp, [~$$"gcd"] ]
+    ; text "return"
+      [Retq, []]
+    ]
+  in
+  [ ("gcd1_4", program_test (gcd 1 4) 1L)
+  ; ("sqrt6_8", program_test (gcd 6 8) 2L)
+  ; ("sqrt9_5", program_test (gcd 9 5) 1L)
+  ; ("sqrt69_67", program_test (gcd 69 67) 1L)
+  ; ("sqrt100_60", program_test (gcd 100 60) 20L) ]
+
 let student_tests = 
   [] 
   @ zkincaid (* Append your tests to this list *)
+  @ satsuma
   @ arnav 
