@@ -207,8 +207,87 @@ let satsuma =
   ; ("sqrt69_67", program_test (gcd 69 67) 1L)
   ; ("sqrt100_60", program_test (gcd 100 60) 20L) ]
 
+
+(* Tests for Richard and John *)
+let richard_john = 
+    
+  let bin_search (target:int) (lst_len:int) (lst:int list) = 
+    [ gtext "main"
+      [ 
+        (* R08 - lo, R09 - hi, R10 - mid, Rax starts of -1*)
+        (Movq, [~$0; ~%R08]);
+        (Movq, [~$(lst_len - 1); ~%R09]);
+        (Movq, [~$0; ~%R10]);
+        (Movq, [~$(-1); ~%Rax]);
+        (Jmp, [~$$"bsearch"])
+
+      ]
+      ; text "bsearch"
+      [
+        (* if lo > hi return -1*)
+        (Cmpq, [~%R09; ~%R08]);
+        (J Gt, [~$$"exit"]);
+
+        (* mid = (lo + hi) >>> 1 *)
+        (Movq, [~%R08; ~%R10]);
+        (Addq, [~%R09; ~%R10]);
+        (Sarq, [~$1; ~%R10]);
+
+        (* load arr[mid] into Rsi, 
+        use R11 as a temp calculation register *)
+        (Leaq, [Ind1 (Lbl "array"); ~%Rsi]);
+        (Movq, [~%R10; ~%R11]);
+        (Imulq, [~$8; ~%R11]);
+        (Addq, [~%R11; ~%Rsi]);
+        (Movq, [Ind2 (Rsi); ~%Rsi]);
+
+        (* if target > arr[mid], lo = mid + 1 *)
+        (Cmpq, [~%Rsi; ~$target]);
+        (J Gt, [~$$"target_gt_mid"]);
+
+        (* if target < arr[mid], hi = mid + 1 *)
+        (J Lt, [~$$"target_lt_mid"]);
+
+        (* fallthrough target = arr[mid] case, rax = mid, return *)
+        (Movq, [~%R10; ~%Rax]);
+        (Jmp, [~$$"exit"])
+        
+      ]
+      ; text "target_gt_mid"
+      [
+        (* lo = mid + 1 *)
+        (Movq, [~%R10; ~%R08]);
+        (Addq, [~$1; ~%R08]);
+        (Jmp, [~$$"bsearch"])
+      ]
+      ; text "target_lt_mid"
+      [
+        (* hi = mid - 1 *)
+        (Movq, [~%R10; ~%R09]);
+        (Subq, [~$1; ~%R09]);
+        (Jmp, [~$$"bsearch"]);
+      ]
+      ; text "exit"
+      [
+        (Retq, [])
+      ]
+      ; data "array" (List.map (fun x -> Quad (Lit (Int64.of_int x))) lst)
+
+    ] 
+  in
+  [
+    ("bin_search1", program_test (bin_search 0 1 [0]) 0L);
+    ("bin_search2", program_test (bin_search 16 10 (List.init 10 (fun x -> x*x)) ) 4L);
+    ("bin_search3", program_test (bin_search 123 1000 (List.init 1000 (fun x -> x)) ) 123L);
+    ("bin_search4", program_test (bin_search 123 1000 (List.init 1000 (fun x -> (x-500) )) ) (623L));
+    ("bin_search5", program_test (bin_search 1500 1000 (List.init 1000 (fun x -> x)) ) (-1L));
+    ("bin_search6", program_test (bin_search 1797 1000 (List.init 1000 (fun x -> 2*x)) ) (-1L));
+  ]
+
+
 let student_tests = 
   [] 
   @ zkincaid (* Append your tests to this list *)
   @ satsuma
   @ arnav 
+  @ richard_john
