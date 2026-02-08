@@ -26,11 +26,11 @@ let program_test_adv (s : string) (p : prog) (f : mach -> bool) () =
 (* Check if the values in registers R08 to R13 exclusive are in sorted order. *)
 let check_sorted_list (m : mach) : (bool) = 
   (* Output list stored in registers R08 to R13 inclusive *)
-  if (get_quad_from_reg m R08) > (get_quad_from_reg m R09) then false
-  else if (get_quad_from_reg m R09) > (get_quad_from_reg m R10) then false
-  else if (get_quad_from_reg m R10) > (get_quad_from_reg m R11) then false
-  else if (get_quad_from_reg m R11) > (get_quad_from_reg m R12) then false
-  else if (get_quad_from_reg m R12) > (get_quad_from_reg m R13) then false
+  if m.regs.(rind R08) > m.regs.(rind R09) then false
+  else if m.regs.(rind R09) > m.regs.(rind R10) then false
+  else if m.regs.(rind R10) > m.regs.(rind R11) then false
+  else if m.regs.(rind R11) > m.regs.(rind R12) then false
+  else if m.regs.(rind R12) > m.regs.(rind R13) then false
   else true
 
 let sbyte_list (a : sbyte array) (start : int) : sbyte list =
