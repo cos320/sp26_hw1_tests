@@ -23,9 +23,8 @@ let program_test_adv (s : string) (p : prog) (f : mach -> bool) () =
   let _ = run m in
   if f m then () else failwith ("expected " ^ s)
 
-(* Check if the values in registers R08 to R13 exclusive are in sorted order. *)
+(* Check if the values in registers R08 to R13 inclusive are in sorted order. *)
 let check_sorted_list (m : mach) : (bool) = 
-  (* Output list stored in registers R08 to R13 inclusive *)
   if m.regs.(rind R08) > m.regs.(rind R09) then false
   else if m.regs.(rind R09) > m.regs.(rind R10) then false
   else if m.regs.(rind R10) > m.regs.(rind R11) then false
