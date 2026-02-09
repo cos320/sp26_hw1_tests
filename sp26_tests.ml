@@ -603,23 +603,23 @@ let isaac =
 
 (* tests for Will Trojniak and Grace Sun *)
 let will_grace = 
+  let mat_to_list (mat: 'a array array) : 'a list =
+    let mat = Array.to_list mat in
+    let mat = List.map Array.to_list mat in
+    List.flatten mat 
+  in
+  let data_of_list (l: int list) : data list =
+    List.map (fun v -> Quad (Lit (Int64.of_int v))) l
+  in
   let mat_mul (a: int array array) (b: int array array) : prog =
-    let mat_to_list (mat: 'a array array) : 'a list =
-      let mat = Array.to_list mat in
-      let mat = List.map Array.to_list mat in
-      List.flatten mat 
-    in
-    let data_of_list (l: int list) : data list =
-      List.map (fun v -> Quad (Lit (Int64.of_int v))) l
-    in
     let m = Array.length a in
     let k = if m = 0 then 0 else Array.length (a.(0)) in
     let n = if k = 0 then 0 else Array.length (b.(0)) in
     let c = Array.make_matrix m n 0 in
     (* Load arrays into data section *)
-    [ data "A" (data_of_list (mat_to_list a)) 
+    [ data "C" (data_of_list (mat_to_list c)) (* Easier to access when checking result *)
+    ; data "A" (data_of_list (mat_to_list a))
     ; data "B" (data_of_list (mat_to_list b))
-    ; data "C" (data_of_list (mat_to_list c))
     ; gtext "main" 
       [ Movq, [~$0; ~%Rax] (* Rax holds sum of elements in resulting mat *)
       ; Movq, [~$0; ~%R08] (* R08 tracks outermost loop --> i = 0 *)
@@ -654,7 +654,7 @@ let will_grace =
       ; Imulq,  [~$n; ~%R11]    (* ptr = i * n *)
       ; Addq,   [~%R10; ~%R11]  (* ptr = i * n + j *)
       ; Imulq,  [~$8; ~%R11]    (* ptr = 8 * (i * n + t) *)
-      ; Addq,   [~$$"A"; ~%R11] (* ptr = c[i * n + j]*)
+      ; Addq,   [~$$"C"; ~%R11] (* ptr = c[i * n + j]*)
       ; Addq,   [~%R12; Ind2 R11] (* c[i][j] += a[i][t] * b[t][j] *)
       ; Addq,   [~%R12; ~%Rax]  (* result += a[i][t] * b[t][j] *)
       ; Incq,   [~%R10]         (* j++ *)
@@ -672,6 +672,30 @@ let will_grace =
       [ Retq, []
       ]
     ]
+  in let program_test_state (s: string) (p : prog) (f : (exec * mach) -> bool) () : unit =
+    let exec = assemble p in
+    let mach = load exec in 
+    let _ = run mach in
+    if f (exec, mach) then () else failwith ("expected " ^ s)
+  in let assert_mat (exec: exec) (mach: mach) (expected: int array array): bool =
+    let mat_list = mat_to_list expected in
+    let c_start = exec.data_pos in
+    let c_start_idx = Option.get (map_addr c_start) in
+    print_int c_start_idx;
+    let checks = List.mapi (fun i v -> 
+      let sbytes = Array.to_list (Array.sub mach.mem (c_start_idx + (8 * i)) 8) in
+      let prog_res = int64_of_sbytes sbytes in
+      let check = (prog_res = (Int64.of_int v)) in
+      if not check then (
+        print_string ("mat_mul saw: " ^ (Int64.to_string prog_res));
+        print_newline ();
+        print_string "mat_mul expected: ";
+        print_int v;
+        print_newline ();
+      );
+      check
+    ) mat_list in
+    List.fold_left (fun acc v -> acc && v) true checks
   in [
       ( let mat_A = Array.make_matrix 2 3 1 in
         let mat_B = Array.make_matrix 3 1 3 in
@@ -682,6 +706,51 @@ let will_grace =
     ; (let mat_A = Array.make_matrix 0 3 5 in
       let mat_B = Array.make_matrix 3 0 5 in
      ("mat_mul 0x3 5s 3x0 5s", program_test (mat_mul mat_A mat_B) 0L))
+    ; (let mat_A = Array.make_matrix 1 1 5 in
+      let mat_B = Array.make_matrix 1 1 8 in
+    ("mat_mul 1x1 5s 1x1 8s", program_test_state "[40]" (mat_mul mat_A mat_B) (fun (e, m) ->
+        let mat_C = Array.make_matrix 1 1 40 in
+        assert_mat e m mat_C
+    )))
+    ; (let mat_A = Array.make_matrix 1 2 5 in
+      let mat_B = Array.make_matrix 2 1 8 in
+    ("mat_mul 1x2 5s 2x1 8s", program_test_state "[80]" (mat_mul mat_A mat_B) (fun (e, m) ->
+        let mat_C = Array.make_matrix 1 1 80 in
+        assert_mat e m mat_C
+    )))
+    ; (let mat_A = Array.make_matrix 2 3 3 in
+      let mat_B = Array.make_matrix 3 4 7 in
+    ("mat_mul 2x3 3s 3x4 7s", program_test_state "\n[\n\t63 63 63 63\n\t63 63 63 63\n]" (mat_mul mat_A mat_B) (fun (e, m) ->
+        let mat_C = Array.make_matrix 2 4 63 in
+        assert_mat e m mat_C
+    )))
+    ; (let mat_A = Array.make_matrix 2 3 3 in
+      mat_A.(0).(0) <- 1;
+      mat_A.(0).(1) <- 2;
+      mat_A.(0).(2) <- 3;
+      mat_A.(1).(0) <- 4;
+      mat_A.(1).(1) <- 5;
+      mat_A.(1).(2) <- 6;
+      let mat_B = Array.make_matrix 3 3 7 in
+      mat_B.(0).(0) <- 7;
+      mat_B.(0).(1) <- 8;
+      mat_B.(0).(2) <- 9;
+      mat_B.(1).(0) <- 10;
+      mat_B.(1).(1) <- 11;
+      mat_B.(1).(2) <- 12;
+      mat_B.(2).(0) <- 13;
+      mat_B.(2).(1) <- 14;
+      mat_B.(2).(2) <- 15;
+    ("mat_mul 2x3 3x3 incr", program_test_state "\n[\n\t66 72 78\n\t156 171 186\n]" (mat_mul mat_A mat_B) (fun (e, m) ->
+        let mat_C = Array.make_matrix 2 3 0 in
+        mat_C.(0).(0) <- 66;
+        mat_C.(0).(1) <- 72;
+        mat_C.(0).(2) <- 78;
+        mat_C.(1).(0) <- 156;
+        mat_C.(1).(1) <- 171;
+        mat_C.(1).(2) <- 186;
+        assert_mat e m mat_C
+    )))
   ]
 
 
