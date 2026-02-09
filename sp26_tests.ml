@@ -454,6 +454,122 @@ let aepli_badoni =
       ("uf100", program_test (uf 100) 0L);  
     ]
 
+(* Tests for Isaac Badipe (member of group 'Sigma Sigma On The Wall') *)
+let isaac = 
+  let imm_of_int x = Lit (Int64.of_int x) in
+  let data_of_int x = Quad (imm_of_int x) in
+  (* Accidentally wrote everything in reverse order, oops *)
+  let operand_order_fixer {lbl; global; asm} =
+    let new_asm =
+      match asm with
+      |  Data(_) -> asm
+      |  Text(insts) -> let f (op, args:ins) = (op, List.rev args) in 
+          Text(List.map f insts)
+    in
+    {lbl; global; asm = new_asm}
+  in
+  let convert_graph graph = Array.to_list graph |> List.map Array.to_list in
+  let dfs (graph : int array array) (start : int) =
+    let graph = convert_graph graph in
+    let n = List.length graph in
+    let flattened_graph = List.flatten graph in
+    (* Test for edge in 2-D adjacency matrix *)
+    List.map operand_order_fixer [ text "is_edge"
+      [ Movq, [~%Rax; ~%Rsi]
+      ; Imulq, [~%Rax; ~$(n * 8)]
+      ; Imulq, [~%Rdx; ~$8]
+      ; Addq, [~%Rax; ~%Rdx]
+      ; Addq, [~%Rax; ~%Rdi]
+      ; Movq, [~%Rax; Ind2 (Rax)]
+      ; Andq, [~%Rax; ~$0xff]
+      ; Retq, []
+      ; ]
+    (* 'Malloc' that uses a probably-free address in memory for data *)
+    ; data "malloc_base" [data_of_int 0x408000]
+    ; text "malloc"
+      [ Movq, [~%Rax; Ind1 (Lbl "malloc_base")]
+      ; Leaq, [~%Rsi; Ind1 (Lbl "malloc_base")]
+      ; Addq, [Ind2 Rsi; ~%Rdi]
+      ; Retq, []
+      ]
+    (* Graph and counter of connected vertices *)
+    ; data "graph" (List.map data_of_int flattened_graph)
+    ; data "connected_counter" [data_of_int 0]
+    ; text "dfs_stub" (* Takes visited array pointer and vertex number *)
+      [ Pushq, [~%Rbp]
+      ; Movq, [~%Rbp; ~%Rsp]
+      ; Subq, [~%Rsp; ~$16]
+      (* Store in stack *)
+      ; Movq, [Ind3 (Lit (-8L), Rbp); ~%Rsi]
+      ; Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdi]
+      (* Check if already visited *)
+      ; Movq, [~%Rax; ~%Rsi]
+      ; Imulq, [~%Rax; ~$8]
+      ; Addq, [~%Rax; ~%Rdi]
+      ; Cmpq, [Ind2 Rax; ~$1]
+      ; J Eq, [~$$"dfs_stub_end"] (* Already visited *)
+      (* Set visited to true, increment counter *)
+      ; Incq, [Ind1 (Lbl "connected_counter")]
+      ; Movq, [Ind2 Rax; ~$1]
+      ; Movq, [~%Rcx; ~$(-1)]
+      ]
+    ; text "loop"
+      [ Incq, [~%Rcx]
+      ; Cmpq, [~%Rcx; ~$n]
+      ; J Ge, [~$$"dfs_stub_end"]
+      ; Movq, [~%Rdi; ~$$"graph"]
+      ; Movq, [~%Rsi; Ind3 (Lit (-8L), Rbp)]
+      ; Movq, [~%Rdx; ~%Rcx]
+      ; Callq, [~$$"is_edge"]
+      ; Cmpq, [~%Rax; ~$1]
+      ; J Neq, [~$$"loop"]
+      ; Movq, [~%Rdi; Ind3 (Lit (-16L), Rbp)]
+      ; Movq, [~%Rsi; ~%Rcx]
+      ; Pushq, [~%Rcx]
+      ; Callq, [~$$"dfs_stub"]
+      ; Popq, [~%Rcx]
+      ; Jmp, [~$$"loop"]
+      ]
+      ; text "dfs_stub_end"
+      [
+        Movq, [~%Rsp; ~%Rbp]
+      ; Popq, [~%Rbp]
+      ; Retq, []
+      ]
+    ; gtext "main"
+      [ Movq, [~%Rdi; ~$(n * n * 8)]
+      (* 'allocate' visited array *)
+      ; Callq, [~$$"malloc"]
+      ; Movq, [~%Rdi; ~%Rax]
+      ; Movq, [~%Rsi; ~$start]
+      (* Call recursive dfs stub *)
+      ; Callq, [~$$"dfs_stub"]
+      (* Return number of connected vertices *)
+      ; Movq, [~%Rax; Ind1 (Lbl "connected_counter")]
+      ; Retq, []
+      ]
+  ]
+  in
+  let new_graph n = Array.make_matrix n n 0 in
+  (* Bidirectional and directional edge adding *)
+  let (%>) graph (a, b) = graph.(a).(b) <- 1; graph in
+  let (%%) graph (a, b) = graph %> (a, b) %> (b, a) in
+
+  let graph1 = (new_graph 2) %% (0, 1) in
+  let graph2 = (new_graph 3) %% (0, 1) %% (1, 2) in
+  let graph3 = (new_graph 10) %% (0, 1) %% (1, 2) %% (2, 6) %% (2, 3) %% (2, 4)
+  %% (5, 6) %% (7, 8) %% (8, 9) in
+  let graph4 = (new_graph 5) %> (0, 1) %% (1, 2) in
+  [
+    ("dfs1", program_test (dfs graph1 0) 2L)
+    ; ("dfs2", program_test (dfs graph2 0) 3L)
+    ; ("dfs3", program_test (dfs graph3 0) 7L)
+    ; ("dfs4", program_test (dfs graph3 5) 7L)
+    ; ("dfs5", program_test (dfs graph3 8) 3L)
+    ; ("dfs6", program_test (dfs graph4 0) 3L)
+    ; ("dfs7", program_test (dfs graph4 1) 2L)
+  ]
+
 let student_tests = 
   [] 
   @ zkincaid (* Append your tests to this list *)
@@ -461,3 +577,4 @@ let student_tests =
   @ arnav 
   @ richard_john  
   @ aepli_badoni
+  @ isaac
