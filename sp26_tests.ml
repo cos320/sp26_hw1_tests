@@ -601,6 +601,90 @@ let isaac =
     ; ("dfs7", program_test (dfs graph4 1) 2L)
   ]
 
+(* tests for Will Trojniak and Grace Sun *)
+let will_grace = 
+  let mat_mul (a: int array array) (b: int array array) : prog =
+    let mat_to_list (mat: 'a array array) : 'a list =
+      let mat = Array.to_list mat in
+      let mat = List.map Array.to_list mat in
+      List.flatten mat 
+    in
+    let data_of_list (l: int list) : data list =
+      List.map (fun v -> Quad (Lit (Int64.of_int v))) l
+    in
+    let m = Array.length a in
+    let k = if m = 0 then 0 else Array.length (a.(0)) in
+    let n = if k = 0 then 0 else Array.length (b.(0)) in
+    let c = Array.make_matrix m n 0 in
+    (* Load arrays into data section *)
+    [ data "A" (data_of_list (mat_to_list a)) 
+    ; data "B" (data_of_list (mat_to_list b))
+    ; data "C" (data_of_list (mat_to_list c))
+    ; gtext "main" 
+      [ Movq, [~$0; ~%Rax] (* Rax holds sum of elements in resulting mat *)
+      ; Movq, [~$0; ~%R08] (* R08 tracks outermost loop --> i = 0 *)
+      ]
+    ; text "loop0"
+      [ Cmpq, [~$m; ~%R08] (* i < m ?*)
+      ; J Ge, [~$$"loop0_exit"]
+      ; Movq, [~$0; ~%R09] (* R09 tracks second loop --> t = 0 *)
+      ]
+    ; text "loop1"
+      [ Cmpq, [~$k; ~%R09] (* t < k ? *)
+      ; J Ge, [~$$"loop1_exit"]
+      ; Movq, [~$0; ~%R10] (* R10 tracks innermost loop --> j = 0 *)
+      ]
+    ; text "loop2"
+      [ Cmpq, [~$n; ~%R10] (* j < n ? *)
+      ; J Ge, [~$$"loop2_exit"]
+      (* c[i][j] += a[i][t] * b[t][j] *)
+      ; Movq,   [~%R08; ~%R11]  (* ptr = i *)
+      ; Imulq,  [~$k; ~%R11]    (* ptr = i * k *)
+      ; Addq,   [~%R09; ~%R11]  (* ptr = i * k + t*)
+      ; Imulq,  [~$8; ~%R11]    (* ptr = 8 * (i * k + t) *)
+      ; Addq,   [~$$"A"; ~%R11] (* ptr = A[i * k + t]*)
+      ; Movq,   [Ind2 R11; ~%R12] (* R12 <- a[i][t] *)
+      ; Movq,   [~%R09; ~%R11]  (* ptr = t *)
+      ; Imulq,  [~$n; ~%R11]    (* ptr = t * n *)
+      ; Addq,   [~%R10; ~%R11]  (* ptr = t * n + j*)
+      ; Imulq,  [~$8; ~%R11]    (* ptr = 8 * (t * n + j) *)
+      ; Addq,   [~$$"B"; ~%R11] (* ptr = B[t * n + j]*)
+      ; Imulq,  [Ind2 R11; ~%R12] (* R12 <- a[i][t] * b[t][j] *)
+      ; Movq,   [~%R08; ~%R11]  (* ptr = i *)
+      ; Imulq,  [~$n; ~%R11]    (* ptr = i * n *)
+      ; Addq,   [~%R10; ~%R11]  (* ptr = i * n + j *)
+      ; Imulq,  [~$8; ~%R11]    (* ptr = 8 * (i * n + t) *)
+      ; Addq,   [~$$"A"; ~%R11] (* ptr = c[i * n + j]*)
+      ; Addq,   [~%R12; Ind2 R11] (* c[i][j] += a[i][t] * b[t][j] *)
+      ; Addq,   [~%R12; ~%Rax]  (* result += a[i][t] * b[t][j] *)
+      ; Incq,   [~%R10]         (* j++ *)
+      ; Jmp,    [~$$"loop2"]
+      ]
+    ; text "loop2_exit"
+      [ Incq, [~%R09] (* t++ *)
+      ; Jmp, [~$$"loop1"]
+      ]
+    ; text "loop1_exit"
+      [ Incq, [~%R08] (* i++ *)
+      ; Jmp, [~$$"loop0"]
+      ]
+    ; text "loop0_exit"
+      [ Retq, []
+      ]
+    ]
+  in [
+      ( let mat_A = Array.make_matrix 2 3 1 in
+        let mat_B = Array.make_matrix 3 1 3 in
+      ("mat_mul 2x3 1s 3x1 3s", program_test (mat_mul mat_A mat_B) 18L))
+    ; (let mat_A = Array.make_matrix 2 3 0 in
+      let mat_B = Array.make_matrix 3 1 3 in
+     ("mat_mul 2x3 0s 3x1 3s", program_test (mat_mul mat_A mat_B) 0L))
+    ; (let mat_A = Array.make_matrix 0 3 5 in
+      let mat_B = Array.make_matrix 3 0 5 in
+     ("mat_mul 0x3 5s 3x0 5s", program_test (mat_mul mat_A mat_B) 0L))
+  ]
+
+
 let student_tests = 
   [] 
   @ zkincaid (* Append your tests to this list *)
@@ -609,3 +693,4 @@ let student_tests =
   @ richard_john  
   @ aepli_badoni
   @ isaac
+  @ will_grace
