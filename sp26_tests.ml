@@ -289,23 +289,27 @@ let richard_john =
 let aepli_badoni = 
   let uf n = 
     let n = max n 4 in
-    [ text "uf_init" [
+    [
+      (* uf_init takes two parameters: n and the base address *)
+       text "uf_init" [
         Movq, [~$0; ~%Rcx];
-        Movq, [~%Rsi; ~%Rax];
+        Movq, [~%Rsi; ~%Rax]; (* &parent[0] *)
 
-        Movq, [~%Rsi; ~%R08];
-        Movq, [~%Rsi; ~%R09];
+        Movq, [~%Rsi; ~%R08]; (* for parent[i] *)
+        Movq, [~%Rsi; ~%R09]; (* for size[i] *)
         Movq, [~%Rdi; ~%R10];
         Imulq, [~$8; ~%R10];
         Addq, [~%R10; ~%R09];
 
-        Movq, [~%R09; ~%Rdx]
+        Movq, [~%R09; ~%Rdx] (* &size[0] *)
       ];
       text "uf_init_loop" [
-        Cmpq, [~%Rdi; ~%Rcx];
+        Cmpq, [~%Rdi; ~%Rcx]; (* if i >= n *)
         J Ge, [~$$"uf_init_endloop"];
+
         Movq, [~%Rcx; Ind2 R08];
         Movq, [~$1; Ind2 R09];
+        
         Incq, [~%Rcx];
         Movq, [~$8; ~%R10];
         Addq, [~%R10; ~%R08];
@@ -316,6 +320,7 @@ let aepli_badoni =
         Retq, []
       ];
 
+      (* uf_find takes two parameters: p and the parent array base address *)
       text "uf_find" [
         Movq, [~%Rdi; ~%Rax];
       ];
@@ -323,10 +328,12 @@ let aepli_badoni =
         Movq, [~%Rax; ~%Rdi];
         Imulq, [~$8; ~%Rdi];
         Movq, [~%Rsi; ~%R08];
-        Addq, [~%Rdi; ~%R08];
+        Addq, [~%Rdi; ~%R08]; (* r08 is &parent[p] *)
+      
         Movq, [Ind2 R08; ~%R09];
         Cmpq, [~%Rax; ~%R09];
         J Eq, [~$$"uf_find_endloop"];
+
         Movq, [~%R09; ~%Rax];
         Jmp, [~$$"uf_find_loop"];
       ];
@@ -334,47 +341,60 @@ let aepli_badoni =
         Retq, []
       ];
 
+      (* uf_connected takes three parameters: p, q, and the parent array *)
       text "uf_connected" [
         Pushq, [~%Rsi];
         Pushq, [~%Rdx];
+
         Movq, [~%Rdx; ~%Rsi];
         Callq, [~$$"uf_find"];
+
         Popq, [~%Rsi];
         Popq, [~%Rdi];
         Pushq, [~%Rax];
         Callq, [~$$"uf_find"];
         Popq, [~%R08];
+
         Movq, [~%Rax; ~%R09];
         Movq, [~$0; ~%Rax];
         Cmpq, [~%R08; ~%R09];
         Set Eq, [~%Rax];
+
         Retq, [];
       ];
 
+      (* four parameters: p, q, parent array, and size array *)
       text "uf_union" [
         Pushq, [~%Rbp];
         Movq, [~%Rsp; ~%Rbp];
+
         Pushq, [~%Rdi];
         Pushq, [~%Rsi];
-        Pushq, [~%Rdx];
-        Pushq, [~%Rcx];
+        Pushq, [~%Rdx]; (* parent array *)
+        Pushq, [~%Rcx]; (* size array *)
+
         Movq, [~%Rdx; ~%Rsi];
         Callq, [~$$"uf_find"];
+
         Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdi];
         Movq, [Ind3 (Lit (-24L), Rbp); ~%Rsi];
         Pushq, [~%Rax];
         Callq, [~$$"uf_find"];
-        Popq, [~%Rcx];
+        Popq, [~%Rcx]; (* rax = rootQ, rcx = rootP *)
+
         Cmpq, [~%Rcx; ~%Rax];
         J Eq, [~$$"uf_union_end"];
+
         Movq, [~%Rcx; ~%R10];
         Movq, [~%Rax; ~%R11];
         Imulq, [~$8; ~%R10];
         Imulq, [~$8; ~%R11];
+
         Movq, [ Ind3 (Lit (-32L), Rbp); ~%Rdi];
         Movq, [~%Rdi; ~%Rsi];
-        Addq, [~%R10; ~%Rdi];
+        Addq, [~%R10; ~%Rdi]; (* &size[rootP] *)
         Addq, [~%R11; ~%Rsi];
+
         Movq, [Ind2 Rdi; ~%R08];
         Movq, [Ind2 Rsi; ~%R09];
         Cmpq, [~%R08; ~%R09];
@@ -382,9 +402,9 @@ let aepli_badoni =
       ];
       text "uf_union_ifbranch" [
         Movq, [Ind3 (Lit (-24L), Rbp); ~%Rcx];
-        Addq, [~%R10; ~%Rcx];
-        Movq, [~%Rax; Ind2 Rcx];
-        Addq, [~%R08; Ind2 Rsi];
+        Addq, [~%R10; ~%Rcx]; (* &parent[rootP] *)
+        Movq, [~%Rax; Ind2 Rcx]; (* parent[rootP] = rootQ *)
+        Addq, [~%R08; Ind2 Rsi]; (* size[rootQ] += size[rootP] *)
         Jmp, [~$$"uf_union_end"];
       ];
       text "uf_union_elsebranch" [
@@ -403,37 +423,48 @@ let aepli_badoni =
       gtext "main" [
         Pushq, [~%Rbp];
         Movq, [~%Rsp; ~%Rbp];
+
         Movq, [~$n; ~%Rdi];
         Movq, [~$0x408000; ~%Rsi];
+
         Pushq, [~%Rdi];
-        Callq, [~$$"uf_init"];
+
+        Callq, [~$$"uf_init"]; (* rax: &parent[0], rdx: &size[0] *)
         Pushq, [~%Rax];
         Pushq, [~%Rdx];
+
         Movq, [~$0; ~%Rdi];
         Movq, [~$3; ~%Rsi];
         Movq, [~%Rdx; ~%Rcx];
         Movq, [~%Rax; ~%Rdx];
         Callq, [~$$"uf_union"];
+
         Movq, [~$1; ~%Rdi];
         Movq, [~$3; ~%Rsi];
         Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdx];
         Movq, [Ind3 (Lit (-24L), Rbp); ~%Rcx];
         Callq, [~$$"uf_union"];
+
         Movq, [~$2; ~%Rdi];
         Movq, [~$0; ~%Rsi];
         Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdx];
         Movq, [Ind3 (Lit (-24L), Rbp); ~%Rcx];
         Callq, [~$$"uf_union"];
+
+        (* First test: verify 1 and 2 connected *)
         Movq, [~$1; ~%Rdi];
         Movq, [~$2; ~%Rsi];
         Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdx];
         Callq, [~$$"uf_connected"];
+
         Cmpq, [~$0; ~%Rax];
         J Eq, [~$$"main_failure"];
+
+        (* Second test: verify 0 and n-1 not connected *)
         Movq, [~$0; ~%Rdi];
         Movq, [Ind3 (Lit (-8L), Rbp); ~%Rsi];
         Subq, [~$1; ~%Rsi];
-        Callq, [~$$"uf_connected"];
+        Callq, [~$$"uf_connected"]; (* rax will be 1 on connection *)
       ];
       text "main_end" [
         Movq, [~%Rbp; ~%Rsp];
