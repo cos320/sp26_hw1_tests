@@ -285,9 +285,179 @@ let richard_john =
   ]
 
 
+(* Tests for Ben Aepli and Vedant Badoni ('compilers' group) *)
+let aepli_badoni = 
+  let uf n = 
+    let n = max n 4 in
+    [ text "uf_init" [
+        Movq, [~$0; ~%Rcx];
+        Movq, [~%Rsi; ~%Rax];
+
+        Movq, [~%Rsi; ~%R08];
+        Movq, [~%Rsi; ~%R09];
+        Movq, [~%Rdi; ~%R10];
+        Imulq, [~$8; ~%R10];
+        Addq, [~%R10; ~%R09];
+
+        Movq, [~%R09; ~%Rdx]
+      ];
+      text "uf_init_loop" [
+        Cmpq, [~%Rdi; ~%Rcx];
+        J Ge, [~$$"uf_init_endloop"];
+        Movq, [~%Rcx; Ind2 R08];
+        Movq, [~$1; Ind2 R09];
+        Incq, [~%Rcx];
+        Movq, [~$8; ~%R10];
+        Addq, [~%R10; ~%R08];
+        Addq, [~%R10; ~%R09];
+        Jmp, [~$$"uf_init_loop"];
+      ];
+      text "uf_init_endloop" [
+        Retq, []
+      ];
+
+      text "uf_find" [
+        Movq, [~%Rdi; ~%Rax];
+      ];
+      text "uf_find_loop" [
+        Movq, [~%Rax; ~%Rdi];
+        Imulq, [~$8; ~%Rdi];
+        Movq, [~%Rsi; ~%R08];
+        Addq, [~%Rdi; ~%R08];
+        Movq, [Ind2 R08; ~%R09];
+        Cmpq, [~%Rax; ~%R09];
+        J Eq, [~$$"uf_find_endloop"];
+        Movq, [~%R09; ~%Rax];
+        Jmp, [~$$"uf_find_loop"];
+      ];
+      text "uf_find_endloop" [
+        Retq, []
+      ];
+
+      text "uf_connected" [
+        Pushq, [~%Rsi];
+        Pushq, [~%Rdx];
+        Movq, [~%Rdx; ~%Rsi];
+        Callq, [~$$"uf_find"];
+        Popq, [~%Rsi];
+        Popq, [~%Rdi];
+        Pushq, [~%Rax];
+        Callq, [~$$"uf_find"];
+        Popq, [~%R08];
+        Movq, [~%Rax; ~%R09];
+        Movq, [~$0; ~%Rax];
+        Cmpq, [~%R08; ~%R09];
+        Set Eq, [~%Rax];
+        Retq, [];
+      ];
+
+      text "uf_union" [
+        Pushq, [~%Rbp];
+        Movq, [~%Rsp; ~%Rbp];
+        Pushq, [~%Rdi];
+        Pushq, [~%Rsi];
+        Pushq, [~%Rdx];
+        Pushq, [~%Rcx];
+        Movq, [~%Rdx; ~%Rsi];
+        Callq, [~$$"uf_find"];
+        Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdi];
+        Movq, [Ind3 (Lit (-24L), Rbp); ~%Rsi];
+        Pushq, [~%Rax];
+        Callq, [~$$"uf_find"];
+        Popq, [~%Rcx];
+        Cmpq, [~%Rcx; ~%Rax];
+        J Eq, [~$$"uf_union_end"];
+        Movq, [~%Rcx; ~%R10];
+        Movq, [~%Rax; ~%R11];
+        Imulq, [~$8; ~%R10];
+        Imulq, [~$8; ~%R11];
+        Movq, [ Ind3 (Lit (-32L), Rbp); ~%Rdi];
+        Movq, [~%Rdi; ~%Rsi];
+        Addq, [~%R10; ~%Rdi];
+        Addq, [~%R11; ~%Rsi];
+        Movq, [Ind2 Rdi; ~%R08];
+        Movq, [Ind2 Rsi; ~%R09];
+        Cmpq, [~%R08; ~%R09];
+        J Ge, [~$$"uf_union_elsebranch"];
+      ];
+      text "uf_union_ifbranch" [
+        Movq, [Ind3 (Lit (-24L), Rbp); ~%Rcx];
+        Addq, [~%R10; ~%Rcx];
+        Movq, [~%Rax; Ind2 Rcx];
+        Addq, [~%R08; Ind2 Rsi];
+        Jmp, [~$$"uf_union_end"];
+      ];
+      text "uf_union_elsebranch" [
+        Movq, [Ind3 (Lit (-24L), Rbp); ~%Rax];
+        Addq, [~%R11; ~%Rax];
+        Movq, [~%Rcx; Ind2 Rax];
+        Addq, [~%R09; Ind2 Rdi];
+      ];
+      text "uf_union_end" [
+        Movq, [~%Rbp; ~%Rsp];
+        Movq, [Ind2 Rbp; ~%Rbp];
+        Addq, [~$8; ~%Rsp];
+        Retq, [];
+      ];
+
+      gtext "main" [
+        Pushq, [~%Rbp];
+        Movq, [~%Rsp; ~%Rbp];
+        Movq, [~$n; ~%Rdi];
+        Movq, [~$0x408000; ~%Rsi];
+        Pushq, [~%Rdi];
+        Callq, [~$$"uf_init"];
+        Pushq, [~%Rax];
+        Pushq, [~%Rdx];
+        Movq, [~$0; ~%Rdi];
+        Movq, [~$3; ~%Rsi];
+        Movq, [~%Rdx; ~%Rcx];
+        Movq, [~%Rax; ~%Rdx];
+        Callq, [~$$"uf_union"];
+        Movq, [~$1; ~%Rdi];
+        Movq, [~$3; ~%Rsi];
+        Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdx];
+        Movq, [Ind3 (Lit (-24L), Rbp); ~%Rcx];
+        Callq, [~$$"uf_union"];
+        Movq, [~$2; ~%Rdi];
+        Movq, [~$0; ~%Rsi];
+        Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdx];
+        Movq, [Ind3 (Lit (-24L), Rbp); ~%Rcx];
+        Callq, [~$$"uf_union"];
+        Movq, [~$1; ~%Rdi];
+        Movq, [~$2; ~%Rsi];
+        Movq, [Ind3 (Lit (-16L), Rbp); ~%Rdx];
+        Callq, [~$$"uf_connected"];
+        Cmpq, [~$0; ~%Rax];
+        J Eq, [~$$"main_failure"];
+        Movq, [~$0; ~%Rdi];
+        Movq, [Ind3 (Lit (-8L), Rbp); ~%Rsi];
+        Subq, [~$1; ~%Rsi];
+        Callq, [~$$"uf_connected"];
+      ];
+      text "main_end" [
+        Movq, [~%Rbp; ~%Rsp];
+        Movq, [Ind2 Rbp; ~%Rbp];
+        Addq, [~$8; ~%Rsp];
+        Retq, [];
+      ];
+      text "main_failure" [
+        Movq, [~$1; ~%Rax];
+        Jmp, [~$$"main_end"];
+      ]
+    ]  
+  in
+    [   
+      ("uf3", program_test (uf 4) 1L);
+      ("uf5", program_test (uf 5) 0L);
+      ("uf10", program_test (uf 10) 0L);
+      ("uf100", program_test (uf 100) 0L);  
+    ]
+
 let student_tests = 
   [] 
   @ zkincaid (* Append your tests to this list *)
   @ satsuma
   @ arnav 
-  @ richard_john
+  @ richard_john  
+  @ aepli_badoni
