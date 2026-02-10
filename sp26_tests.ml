@@ -202,10 +202,10 @@ let satsuma =
     ]
   in
   [ ("gcd1_4", program_test (gcd 1 4) 1L)
-  ; ("sqrt6_8", program_test (gcd 6 8) 2L)
-  ; ("sqrt9_5", program_test (gcd 9 5) 1L)
-  ; ("sqrt69_67", program_test (gcd 69 67) 1L)
-  ; ("sqrt100_60", program_test (gcd 100 60) 20L) ]
+  ; ("gcd6_8", program_test (gcd 6 8) 2L)
+  ; ("gcd9_5", program_test (gcd 9 5) 1L)
+  ; ("gcd69_67", program_test (gcd 69 67) 1L)
+  ; ("gcd100_60", program_test (gcd 100 60) 20L) ]
 
 
 (* Tests for Richard and John *)
