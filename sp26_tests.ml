@@ -879,6 +879,104 @@ let cbaird_jroy =
   ; ("empty_array", program_test (lower_bound_iter 0 [] 42L) 0L)
   ]
 
+(* Tests for Daniel Yang (yanda) *)
+let yanda =
+  (* Returns the number of primes less than or equal to n *)
+  let primecount n =
+    (* 
+    sieve = [0, 0, 1, ..., 1]
+    p = 0
+    ans = 0
+
+    outer_loop:
+      if sieve[p] = 0 then j next_p
+      else
+        i = 2 * p
+        j inner_loop
+
+    inner_loop:
+      if i > N then j next_p
+      sieve[i] = 0
+      i += p
+      j inner_loop
+    
+    next_p:
+      p += 1
+      if p * p <= N then j outer_loop
+      p = 1
+      j count
+    
+    count:
+      p += 1
+      if p > N then j end
+      ans += sieve[p]
+    
+    end:
+      retq
+    *)
+    [ data "sieve" (List.init (n + 1) (fun i -> Quad (Lit (if i >= 2 then 1L else 0L))))
+    ; gtext
+        "main"
+        [ Leaq, [ Ind1 (Lbl "sieve"); ~%R08 ]  (* sieve base *)
+        ; Movq, [ ~$n; ~%R09 ]                 (* n *)
+        ; Movq, [ ~$0; ~%Rax ]                 (* ans *)
+        ; Movq, [ ~$0; ~%Rbx ]                 (* p *)
+        ; Movq, [ ~%R08; ~%Rdi ]               (* pointer to sieve[p] *)
+        ]
+    ; text
+        "outer_loop"
+        [ Movq, [ Ind2 Rdi; ~%R10 ] (* sieve[p] *)
+        ; Cmpq, [ ~$0; ~%R10 ]      (* if sieve[p] = 0 *)
+        ; J Eq, [ ~$$"next_p" ]     (* j next_p *)
+        ; Movq, [ ~%Rbx; ~%Rcx ]
+        ; Imulq, [ ~$2; ~%Rcx ]     (* i = 2 * p *)
+        ; Movq, [ ~$8; ~%R10 ]
+        ; Imulq, [ ~%Rbx; ~%R10 ]   (* r10 = 8 * p *)
+        ; Movq, [ ~%Rdi; ~%Rsi ]
+        ; Addq, [ ~%R10; ~%Rsi ]    (* copy and set sieve pointer for inner loop *)
+        ; Jmp, [ ~$$"inner_loop" ]
+        ]
+    ; text
+        "inner_loop"
+        [ Cmpq, [ ~%R09; ~%Rcx ]    (* if i > n *)
+        ; J Gt, [ ~$$"next_p" ]     (* j next_p *)
+        ; Movq, [ ~$0; Ind2 Rsi ]   (* sieve[i] = 0 *)
+        ; Addq, [ ~%Rbx; ~%Rcx ]    (* i += p *)
+        ; Addq, [ ~%R10; ~%Rsi ]    (* pointer += r10 *)
+        ; Jmp, [ ~$$"inner_loop" ]
+        ]
+    ; text
+        "next_p"
+        [ Incq, [ ~%Rbx ]           (* p += 1 *)
+        ; Addq, [ ~$8; ~%Rdi ]      (* increment pointer *)
+        ; Movq, [ ~%Rbx; ~%R10 ]
+        ; Imulq, [ ~%R10; ~%R10 ]
+        ; Cmpq, [ ~%R09; ~%R10 ]    (* if p * p <= n *)
+        ; J Le, [ ~$$"outer_loop" ] (* j outer_loop *)
+        ; Movq, [ ~$1; ~%Rbx ]      (* reset p and move to count *)
+        ; Leaq, [ Ind3 (Lit 8L, R08); ~%Rdi ]
+        ; Jmp, [ ~$$"count" ]
+        ]
+    ; text
+        "count"
+        [ Incq, [ ~%Rbx ]           (* p += 1 *)
+        ; Addq, [ ~$8; ~%Rdi ]      (* increment pointer *)
+        ; Cmpq, [ ~%R09; ~%Rbx ]    (* if p > n *)
+        ; J Gt, [ ~$$"end" ]        (* j end *)
+        ; Movq, [ Ind2 Rdi; ~%R10 ]
+        ; Addq, [ ~%R10; ~%Rax ]    (* ans += sieve[p] *)
+        ; Jmp, [ ~$$"count" ]
+        ]
+    ; text "end" [ Retq, [] ]
+    ]
+  in
+  (* pi(n) is the prime-counting function, or the number of primes less than or equal to n *)
+  [ "pi2", program_test (primecount 2) 1L
+  ; "pi10", program_test (primecount 10) 4L
+  ; "pi100", program_test (primecount 100) 25L
+  ; "pi1000", program_test (primecount 1000) 168L
+  ]
+;;
 
 let student_tests = 
   [] 
@@ -891,3 +989,4 @@ let student_tests =
   @ will_grace
   @ miku
   @ cbaird_jroy
+  @ yanda
