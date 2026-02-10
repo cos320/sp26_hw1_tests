@@ -803,6 +803,82 @@ let miku =
     ("miku_power_2_10", program_test (power 2 10) 1024L);
   ]
 
+(* Tests for Colin Baird, Jishnu Roychoudhury*)
+let lower_bound_iter n arr x =
+  [
+      text "lower_bound"
+      [
+        Cmpq, [~$0; ~%Rsi];
+        J Eq, [~$$"ret_n"]; (* if n == 0, return n *)
+        Movq, [~$0; ~%Rax]; (*l = 0*)
+        Movq, [~%Rsi; ~%Rbx];
+        Subq, [~$1; ~%Rbx]; (*r = n-1*)
+        Jmp, [~$$"loop"]
+      ]
+    ; text "loop"
+      [
+        Cmpq, [~%Rbx; ~%Rax];
+        J Ge, [~$$"finish"]; (*goto finish if l>=r*)
+        Movq, [~%Rax; ~%Rcx];
+        Addq, [~%Rbx; ~%Rcx];
+        Shrq, [~$1; ~%Rcx]; (*mid = (l+r)/2*)
+        
+        Movq, [~%Rcx; ~%R08]; (*put mid in R08*)
+        Shlq, [~$3; ~%R08]; (*multiply by 8*)
+        Addq, [~%Rdi; ~%R08]; (*add arr base address*)
+        Movq, [Ind2 R08; ~%R09]; (*mem at address arr[mid]*)
+
+        Cmpq, [~%Rdx; ~%R09];
+        J Ge, [~$$"set_r"]; (*set r if a[mid]>=x*)
+        
+        Movq, [~%Rcx; ~%Rax];
+        Addq, [~$1; ~%Rax]; (*fallthrough set l=m+1*)
+        Jmp, [~$$"loop"]
+      ]
+    ; text "set_r"
+      [
+        Movq, [~%Rcx; ~%Rbx]; (*r=m*)
+        Jmp, [~$$"loop"]
+      ]
+    ; text "finish"
+      [
+        (*We know a[l] >= x UNLESS l=n-1 and a[n-1] < x *)
+        Movq, [~%Rax; ~%R08];
+        Shlq, [~$3; ~%R08];
+        Addq, [~%Rdi; ~%R08];
+        Movq, [Ind2 R08; ~%R09]; (*get a[l] in R09*)
+        Cmpq, [~%Rdx; ~%R09];
+        J Ge, [~$$"ret"]; (*a[l] >= x*)
+        Jmp,  [~$$"ret_n"] (*a[l] < x => l=n-1 => answer is n*)
+      ]
+    ; text "ret"
+      [
+        Retq, []
+      ]
+    ; text "ret_n"
+      [
+        Movq, [~%Rsi; ~%Rax]; (*return n*)
+        Retq, []
+      ]
+
+    ; gtext "main"
+      [ Leaq, [Ind1(Lbl "arr"); ~%Rdi];
+        Movq, [~$n; ~%Rsi];
+        Movq, [Imm(Lit x); ~%Rdx];
+        Callq, [~$$"lower_bound"];
+        Retq, []
+      ]
+    ; data "arr" (List.map (fun v -> Quad (Lit v)) arr)
+  ]
+
+let cbaird_jroy =
+  [ ("exact_lb", program_test (lower_bound_iter 5 [1L;3L;5L;7L;9L] 5L) 2L)
+  ; ("bigger_than_all_returns_n", program_test (lower_bound_iter 3 [10L;20L;30L] 100L) 3L)
+  ; ("between_values", program_test (lower_bound_iter 5 [1L;3L;5L;7L;9L] 6L) 3L)
+  ; ("dups_first_occurrence", program_test (lower_bound_iter 6 [1L;2L;2L;2L;3L;4L] 2L) 1L)
+  ; ("empty_array", program_test (lower_bound_iter 0 [] 42L) 0L)
+  ]
+
 
 let student_tests = 
   [] 
