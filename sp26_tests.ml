@@ -397,7 +397,7 @@ let aepli_badoni =
 
         Movq, [Ind2 Rdi; ~%R08];
         Movq, [Ind2 Rsi; ~%R09];
-        Cmpq, [~%R08; ~%R09];
+        Cmpq, [~%R09; ~%R08];
         J Ge, [~$$"uf_union_elsebranch"];
       ];
       text "uf_union_ifbranch" [
@@ -479,7 +479,7 @@ let aepli_badoni =
     ]  
   in
     [   
-      ("uf3", program_test (uf 4) 1L);
+      ("uf4", program_test (uf 4) 1L);
       ("uf5", program_test (uf 5) 0L);
       ("uf10", program_test (uf 10) 0L);
       ("uf100", program_test (uf 100) 0L);  
