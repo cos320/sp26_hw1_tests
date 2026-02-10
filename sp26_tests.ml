@@ -615,7 +615,7 @@ let will_grace =
     let n = if k = 0 then 0 else Array.length (b.(0)) in
     let c = Array.make_matrix m n 0 in
     (* Load arrays into data section *)
-    [ data "C" (data_of_list (mat_to_list c)) (* Easier to access when checking result *)
+    [ data "C" (data_of_list (mat_to_list c)) (* Easier to check result *)
     ; data "A" (data_of_list (mat_to_list a))
     ; data "B" (data_of_list (mat_to_list b))
     ; gtext "main" 
@@ -670,17 +670,17 @@ let will_grace =
       [ Retq, []
       ]
     ]
-  in let program_test_state (s: string) (p : prog) (f : (exec * mach) -> bool) () : unit =
+  in let program_test_state (s: string) (p) (f : (exec * mach) -> bool) () =
     let exec = assemble p in
     let mach = load exec in 
     let _ = run mach in
     if f (exec, mach) then () else failwith ("expected " ^ s)
-  in let assert_mat (exec: exec) (mach: mach) (expected: int array array): bool =
-    let mat_list = mat_to_list expected in
+  in let assert_mat (exec: exec) (mach: mach) (expctd: int array array): bool =
+    let mat_list = mat_to_list expctd in
     let c_start = exec.data_pos in
-    let c_start_idx = Option.get (map_addr c_start) in
+    let c_idx = Option.get (map_addr c_start) in
     let checks = List.mapi (fun i v -> 
-      let sbytes = Array.to_list (Array.sub mach.mem (c_start_idx + (8 * i)) 8) in
+      let sbytes = Array.to_list (Array.sub mach.mem (c_idx + (8 * i)) 8) in
       let prog_res = int64_of_sbytes sbytes in
       let check = (prog_res = (Int64.of_int v)) in
       if not check then (
@@ -705,21 +705,25 @@ let will_grace =
      ("mat_mul 0x3 5s 3x0 5s", program_test (mat_mul mat_A mat_B) 0L))
     ; (let mat_A = Array.make_matrix 1 1 5 in
       let mat_B = Array.make_matrix 1 1 8 in
-    ("mat_mul 1x1 5s 1x1 8s", program_test_state "[40]" (mat_mul mat_A mat_B) (fun (e, m) ->
-        let mat_C = Array.make_matrix 1 1 40 in
-        assert_mat e m mat_C
+    ("mat_mul 1x1 5s 1x1 8s", program_test_state "[40]" 
+        (mat_mul mat_A mat_B) (fun (e, m) ->
+          let mat_C = Array.make_matrix 1 1 40 in
+          assert_mat e m mat_C
     )))
     ; (let mat_A = Array.make_matrix 1 2 5 in
       let mat_B = Array.make_matrix 2 1 8 in
-    ("mat_mul 1x2 5s 2x1 8s", program_test_state "[80]" (mat_mul mat_A mat_B) (fun (e, m) ->
-        let mat_C = Array.make_matrix 1 1 80 in
-        assert_mat e m mat_C
+    ("mat_mul 1x2 5s 2x1 8s", program_test_state "[80]" 
+        (mat_mul mat_A mat_B) (fun (e, m) ->
+          let mat_C = Array.make_matrix 1 1 80 in
+          assert_mat e m mat_C
     )))
     ; (let mat_A = Array.make_matrix 2 3 3 in
       let mat_B = Array.make_matrix 3 4 7 in
-    ("mat_mul 2x3 3s 3x4 7s", program_test_state "\n[\n\t63 63 63 63\n\t63 63 63 63\n]" (mat_mul mat_A mat_B) (fun (e, m) ->
-        let mat_C = Array.make_matrix 2 4 63 in
-        assert_mat e m mat_C
+    ("mat_mul 2x3 3s 3x4 7s", program_test_state 
+        "\n[\n\t63 63 63 63\n\t63 63 63 63\n]" 
+        (mat_mul mat_A mat_B) (fun (e, m) ->
+          let mat_C = Array.make_matrix 2 4 63 in
+          assert_mat e m mat_C
     )))
     ; (let mat_A = Array.make_matrix 2 3 3 in
       mat_A.(0).(0) <- 1;
@@ -738,15 +742,16 @@ let will_grace =
       mat_B.(2).(0) <- 13;
       mat_B.(2).(1) <- 14;
       mat_B.(2).(2) <- 15;
-    ("mat_mul 2x3 3x3 incr", program_test_state "\n[\n\t66 72 78\n\t156 171 186\n]" (mat_mul mat_A mat_B) (fun (e, m) ->
-        let mat_C = Array.make_matrix 2 3 0 in
-        mat_C.(0).(0) <- 66;
-        mat_C.(0).(1) <- 72;
-        mat_C.(0).(2) <- 78;
-        mat_C.(1).(0) <- 156;
-        mat_C.(1).(1) <- 171;
-        mat_C.(1).(2) <- 186;
-        assert_mat e m mat_C
+    ("mat_mul 2x3 3x3 incr", program_test_state 
+        "\n[\n\t66 72 78\n\t156 171 186\n]" (mat_mul mat_A mat_B) (fun (e, m) ->
+          let mat_C = Array.make_matrix 2 3 0 in
+          mat_C.(0).(0) <- 66;
+          mat_C.(0).(1) <- 72;
+          mat_C.(0).(2) <- 78;
+          mat_C.(1).(0) <- 156;
+          mat_C.(1).(1) <- 171;
+          mat_C.(1).(2) <- 186;
+          assert_mat e m mat_C
     )))
   ]
 
