@@ -890,3 +890,4 @@ let student_tests =
   @ isaac
   @ will_grace
   @ miku
+  @ cbaird_jroy
