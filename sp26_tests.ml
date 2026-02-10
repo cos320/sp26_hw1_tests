@@ -679,7 +679,6 @@ let will_grace =
     let mat_list = mat_to_list expected in
     let c_start = exec.data_pos in
     let c_start_idx = Option.get (map_addr c_start) in
-    print_int c_start_idx;
     let checks = List.mapi (fun i v -> 
       let sbytes = Array.to_list (Array.sub mach.mem (c_start_idx + (8 * i)) 8) in
       let prog_res = int64_of_sbytes sbytes in
