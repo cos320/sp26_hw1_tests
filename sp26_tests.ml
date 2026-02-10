@@ -751,6 +751,54 @@ let will_grace =
     )))
   ]
 
+(* Tests for miku *)
+let miku =
+  let power base exp =
+    [
+      text "power"
+        [
+          (Cmpq, [ ~$0; ~%Rsi ]);
+          (J Gt, [ ~$$"loop" ]);
+          (Movq, [ ~$1; ~%Rax ]);
+          (Retq, []);
+        ];
+      text "loop"
+        [ (Movq, [ ~$1; ~%Rax ]) ];
+      text "loop_body"
+        [
+          (Cmpq, [ ~$0; ~%Rsi ]);
+          (J Le, [ ~$$"exit" ]);
+          (Movq, [ ~%Rsi; ~%Rcx ]);
+          (Andq, [ ~$1; ~%Rcx ]);
+          (Cmpq, [ ~$0; ~%Rcx ]);
+          (J Eq, [ ~$$"square" ]);
+          (Imulq, [ ~%Rdi; ~%Rax ]);
+        ];
+      text "square"
+        [
+          (Imulq, [ ~%Rdi; ~%Rdi ]);
+          (Sarq, [ ~$1; ~%Rsi ]);
+          (Jmp, [ ~$$"loop_body" ]);
+        ];
+      text "exit" [ (Retq, []) ];
+      gtext "main"
+        [
+          (Movq, [ ~$base; ~%Rdi ]);
+          (Movq, [ ~$exp; ~%Rsi ]);
+          (Callq, [ ~$$"power" ]);
+          (Retq, []);
+        ];
+    ]
+  in
+  [
+    ("miku_power_2_0", program_test (power 2 0) 1L);
+    ("miku_power_2_3", program_test (power 2 3) 8L);
+    ("miku_power_3_2", program_test (power 3 2) 9L);
+    ("miku_power_5_2", program_test (power 5 2) 25L);
+    ("miku_power_10_0", program_test (power 10 0) 1L);
+    ("miku_power_2_10", program_test (power 2 10) 1024L);
+  ]
+
 
 let student_tests = 
   [] 
@@ -761,3 +809,4 @@ let student_tests =
   @ aepli_badoni
   @ isaac
   @ will_grace
+  @ miku
