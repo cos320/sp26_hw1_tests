@@ -415,8 +415,7 @@ let aepli_badoni =
       ];
       text "uf_union_end" [
         Movq, [~%Rbp; ~%Rsp];
-        Movq, [Ind2 Rbp; ~%Rbp];
-        Addq, [~$8; ~%Rsp];
+        Popq, [~%Rbp];
         Retq, [];
       ];
 
@@ -468,8 +467,7 @@ let aepli_badoni =
       ];
       text "main_end" [
         Movq, [~%Rbp; ~%Rsp];
-        Movq, [Ind2 Rbp; ~%Rbp];
-        Addq, [~$8; ~%Rsp];
+        Popq, [~%Rbp];
         Retq, [];
       ];
       text "main_failure" [
